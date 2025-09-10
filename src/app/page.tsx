@@ -1,103 +1,318 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, FileText, ThumbsUp, ThumbsDown, Upload, X } from "lucide-react"
+
+interface SimplificationResult {
+  summary: string
+  pros: string[]
+  cons: string[]
+}
+
+export default function HomePage() {
+  const [policyText, setPolicyText] = useState("")
+  const [result, setResult] = useState<SimplificationResult | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [isProcessingFile, setIsProcessingFile] = useState(false)
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = [
+      'text/plain',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ]
+
+    if (!allowedTypes.includes(file.type)) {
+      setError("Please upload a text file, PDF, or Word document")
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File size must be less than 10MB")
+      return
+    }
+
+    setUploadedFile(file)
+    setIsProcessingFile(true)
+    setError("")
+
+    try {
+      let text = ""
+      
+      if (file.type === 'text/plain') {
+        text = await file.text()
+      } else if (file.type === 'application/pdf') {
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const response = await fetch('/api/extract-text', {
+          method: 'POST',
+          body: formData,
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to extract text from PDF')
+        }
+        
+        const data = await response.json()
+        text = data.text
+      } else {
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const response = await fetch('/api/extract-text', {
+          method: 'POST',
+          body: formData,
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to extract text from document')
+        }
+        
+        const data = await response.json()
+        text = data.text
+      }
+
+      setPolicyText(text)
+    } catch (err) {
+      setError("Failed to process the uploaded file")
+      console.error("File processing error:", err)
+      setUploadedFile(null)
+    } finally {
+      setIsProcessingFile(false)
+    }
+  }
+
+  const removeFile = () => {
+    setUploadedFile(null)
+    setPolicyText("")
+  }
+
+  const handleSimplify = async () => {
+    if (!policyText.trim()) {
+      setError("Please enter some policy text or upload a file to analyze.")
+      return
+    }
+
+    setIsLoading(true)
+    setError("")
+    setResult(null)
+
+    try {
+      const response = await fetch("/api/simplify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: policyText }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to simplify policy")
+      }
+
+      const data = await response.json()
+      setResult(data)
+    } catch (err) {
+      setError("Failed to analyze the policy. Please try again.")
+      console.error("Error:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-primary mb-4 text-balance">
+            Policy in Plain English – Making Governance Accessible
+          </h1>
+          <p className="text-lg text-muted-foreground text-pretty">
+            Transform complex government policies into clear, understandable summaries with pros and cons analysis.
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Input Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Policy Input
+            </CardTitle>
+            <CardDescription>Upload a policy document or paste the text directly</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* File Upload */}
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-muted-foreground/50 transition-colors">
+              <input
+                type="file"
+                id="policy-file"
+                className="hidden"
+                accept=".txt,.pdf,.doc,.docx"
+                onChange={handleFileUpload}
+                disabled={isProcessingFile}
+              />
+              <label htmlFor="policy-file" className="cursor-pointer">
+                <div className="flex flex-col items-center gap-2">
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      {isProcessingFile ? "Processing file..." : "Click to upload a policy document"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Supports TXT, PDF, DOC, DOCX (up to 10MB)
+                    </p>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Uploaded File Display */}
+            {uploadedFile && (
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  <span className="text-sm font-medium">{uploadedFile.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({(uploadedFile.size / 1024).toFixed(1)} KB)
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={removeFile}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or paste text directly</span>
+              </div>
+            </div>
+
+            {/* Text Area */}
+            <Textarea
+              placeholder="Paste your government policy or bill text here..."
+              value={policyText}
+              onChange={(e) => setPolicyText(e.target.value)}
+              className="min-h-[200px] resize-none"
+              disabled={isProcessingFile}
+            />
+
+            <Button 
+              onClick={handleSimplify} 
+              disabled={isLoading || isProcessingFile || !policyText.trim()} 
+              className="w-full" 
+              size="lg"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing policy…
+                </>
+              ) : isProcessingFile ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing file…
+                </>
+              ) : (
+                "Simplify Policy"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive" className="mb-8">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Results */}
+        {result && (
+          <div className="space-y-6">
+            {/* Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-primary">Plain-English Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-foreground leading-relaxed">{result.summary}</p>
+              </CardContent>
+            </Card>
+
+            {/* Pros and Cons */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Pros */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-green-700">
+                    <ThumbsUp className="h-5 w-5" />
+                    Pros
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {result.pros.map((pro, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
+                        <span 
+                          className="text-foreground leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: pro }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              {/* Cons */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-red-700">
+                    <ThumbsDown className="h-5 w-5" />
+                    Cons
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {result.cons.map((con, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0" />
+                        <span 
+                          className="text-foreground leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: con }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-  );
+  )
 }
