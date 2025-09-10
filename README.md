@@ -33,7 +33,7 @@ We make governance **accessible to everyone not just lawyers and politicians.**
 ---
 
 ## Demo
-**Live Demo:** []()  
+**Live Demo:** [Policy-in-Plain-English](https://policy-iota-ten.vercel.app/)  
 
 ---
 
