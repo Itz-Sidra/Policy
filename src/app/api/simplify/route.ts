@@ -31,7 +31,12 @@ CONS:
 2. [Second con]
 3. [Third con]`
 
-    const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string)
+    const base64Credentials = process.env.GOOGLE_CREDENTIALS_BASE64
+    if (!base64Credentials) {
+      throw new Error("Missing GOOGLE_CREDENTIALS_BASE64 environment variable")
+    }
+    const credentialsJson = Buffer.from(base64Credentials, "base64").toString("utf-8")
+    const credentials = JSON.parse(credentialsJson)
 
     const auth = new GoogleAuth({
       credentials,
@@ -86,7 +91,7 @@ function extractListItems(text: string): string[] {
     .split(/\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .filter(line => !line.match(/^\*\*\w+\*\*$/)) 
+    .filter(line => !line.match(/^\*\*\w+\*\*$/))
     .map((line) => line.replace(/^\d+\.\s*/, "").replace(/^[-•*]\s*/, ""))
     .map(line => cleanMarkdown(line))
 }
