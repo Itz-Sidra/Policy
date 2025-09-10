@@ -31,9 +31,13 @@ CONS:
 2. [Second con]
 3. [Third con]`
 
+    const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string)
+
     const auth = new GoogleAuth({
+      credentials,
       scopes: ["https://www.googleapis.com/auth/generative-language"],
     })
+
     const client = await auth.getClient()
 
     const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent`
@@ -87,8 +91,6 @@ function extractListItems(text: string): string[] {
     .map(line => cleanMarkdown(line))
 }
 
-
 function cleanMarkdown(text: string): string {
   return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-  
 }
